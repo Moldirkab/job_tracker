@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { ApiError, createApplication } from "../services/api";
 import type { ApplicationStatus } from "../types/application";
 import LoadingSpinner from "../components/LoadingSpinner";
+import SkillsInput from "../components/SkillsInput";
 
 const STATUS_OPTIONS: { value: ApplicationStatus; label: string }[] = [
   { value: "APPLIED", label: "Applied" },
@@ -20,6 +21,8 @@ export default function AddApplication() {
   const [location, setLocation] = useState("");
   const [status, setStatus] = useState<ApplicationStatus>("APPLIED");
   const [jobUrl, setJobUrl] = useState("");
+  const [salary, setSalary] = useState("");
+  const [skills, setSkills] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
 
   const [error, setError] = useState<string | null>(null);
@@ -51,6 +54,8 @@ export default function AddApplication() {
         location: location.trim(),
         status,
         ...(jobUrl.trim() ? { job_url: jobUrl.trim() } : {}),
+        ...(salary.trim() ? { salary: salary.trim() } : {}),
+        ...(skills.length > 0 ? { skills } : {}),
         ...(notes.trim() ? { notes: notes.trim() } : {}),
       });
       navigate(`/applications/${application.id}`, { replace: true });
@@ -164,22 +169,50 @@ export default function AddApplication() {
           </div>
         </div>
 
+        <div className="mb-4 grid gap-4 sm:grid-cols-2">
+          <div>
+            <label
+              htmlFor="jobUrl"
+              className="mb-1.5 block text-sm font-medium text-ink"
+            >
+              Job URL{" "}
+              <span className="font-normal text-ink-faint">(optional)</span>
+            </label>
+            <input
+              id="jobUrl"
+              type="url"
+              value={jobUrl}
+              onChange={(e) => setJobUrl(e.target.value)}
+              className="w-full rounded-md border border-border-strong bg-white px-3 py-2 text-sm text-ink outline-none placeholder:text-ink-faint focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+              placeholder="https://careers.example.com/job/123"
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor="salary"
+              className="mb-1.5 block text-sm font-medium text-ink"
+            >
+              Salary{" "}
+              <span className="font-normal text-ink-faint">(optional)</span>
+            </label>
+            <input
+              id="salary"
+              type="text"
+              value={salary}
+              onChange={(e) => setSalary(e.target.value)}
+              className="w-full rounded-md border border-border-strong bg-white px-3 py-2 text-sm text-ink outline-none placeholder:text-ink-faint focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+              placeholder="$120,000 – $150,000"
+            />
+          </div>
+        </div>
+
         <div className="mb-4">
-          <label
-            htmlFor="jobUrl"
-            className="mb-1.5 block text-sm font-medium text-ink"
-          >
-            Job URL{" "}
+          <label className="mb-1.5 block text-sm font-medium text-ink">
+            Skills{" "}
             <span className="font-normal text-ink-faint">(optional)</span>
           </label>
-          <input
-            id="jobUrl"
-            type="url"
-            value={jobUrl}
-            onChange={(e) => setJobUrl(e.target.value)}
-            className="w-full rounded-md border border-border-strong bg-white px-3 py-2 text-sm text-ink outline-none placeholder:text-ink-faint focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
-            placeholder="https://careers.example.com/job/123"
-          />
+          <SkillsInput value={skills} onChange={setSkills} />
         </div>
 
         <div className="mb-6">

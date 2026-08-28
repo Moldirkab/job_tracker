@@ -1,15 +1,16 @@
 export type ApplicationStatus = "APPLIED" | "INTERVIEW" | "OFFER" | "REJECTED";
 
 export interface Application {
-  id: string;
+  id: number;
   company: string;
   position: string;
   location: string;
   status: ApplicationStatus;
   job_url?: string | null;
   notes?: string | null;
+  salary?: string | null;
+  skills?: string[] | null;
   created_at: string;
-  updated_at: string;
 }
 
 export interface CreateApplicationInput {
@@ -19,12 +20,14 @@ export interface CreateApplicationInput {
   status: ApplicationStatus;
   job_url?: string;
   notes?: string;
+  salary?: string;
+  skills?: string[];
 }
 
 export type UpdateApplicationInput = Partial<CreateApplicationInput>;
 
 export interface User {
-  id: string;
+  id: number;
   email: string;
 }
 

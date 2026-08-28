@@ -2,9 +2,10 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 const NAV_LINKS = [
-  { to: "/dashboard", label: "Dashboard" },
-  { to: "/applications", label: "Applications" },
-  { to: "/applications/new", label: "Add Application" },
+  { to: "/dashboard", label: "Dashboard", end: true },
+  { to: "/applications", label: "Applications", end: true },
+  { to: "/applications/new", label: "Add Application", end: false },
+  { to: "/applications/import", label: "Import with AI", end: false },
 ];
 
 export default function Navbar() {
@@ -34,6 +35,7 @@ export default function Navbar() {
               <NavLink
                 key={link.to}
                 to={link.to}
+                end={link.end}
                 className={({ isActive }) =>
                   `rounded-md px-3 py-2 text-sm font-medium transition-colors ${
                     isActive
@@ -62,6 +64,7 @@ export default function Navbar() {
           <NavLink
             key={link.to}
             to={link.to}
+            end={link.end}
             className={({ isActive }) =>
               `whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium ${
                 isActive ? "bg-brand-50 text-brand-700" : "text-ink-muted"

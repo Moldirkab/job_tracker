@@ -39,10 +39,12 @@ export class ApiError extends Error {
     this.details = details;
   }
 }
-
-function friendlyMessageForStatus(status: number, fallback?: string): string {
+function friendlyMessageForStatus(status: number, fallback?: string, isAuthEndpoint?: boolean): string {
   switch (status) {
     case 401:
+      if (isAuthEndpoint) {
+        return fallback || "Invalid email or password.";
+      }
       return "Your session has expired. Please log in again.";
     case 404:
       return "We couldn't find what you were looking for.";
@@ -110,13 +112,13 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
         ? String((payload as { detail: unknown }).detail)
         : undefined;
 
-    if (response.status === 401) {
+    if (response.status === 401 && auth) {
       clearToken();
     }
 
     throw new ApiError(
       response.status,
-      friendlyMessageForStatus(response.status, detailMessage),
+      friendlyMessageForStatus(response.status, detailMessage, !auth),
       payload
     );
   }
@@ -147,12 +149,11 @@ export function login(email: string, password: string): Promise<AuthResponse> {
 // ---------------------------------------------------------------------------
 // Application endpoints
 // ---------------------------------------------------------------------------
-
 export function getApplications(): Promise<Application[]> {
   return request("/api/applications");
 }
 
-export function getApplication(id: string): Promise<Application> {
+export function getApplication(id: number | string): Promise<Application> {
   return request(`/api/applications/${id}`);
 }
 
@@ -164,7 +165,7 @@ export function createApplication(input: CreateApplicationInput): Promise<Applic
 }
 
 export function updateApplication(
-  id: string,
+  id: number | string,
   input: UpdateApplicationInput
 ): Promise<Application> {
   return request(`/api/applications/${id}`, {
@@ -173,7 +174,7 @@ export function updateApplication(
   });
 }
 
-export function deleteApplication(id: string): Promise<void> {
+export function deleteApplication(id: number | string): Promise<void> {
   return request(`/api/applications/${id}`, {
     method: "DELETE",
   });

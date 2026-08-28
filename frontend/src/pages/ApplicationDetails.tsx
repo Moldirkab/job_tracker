@@ -21,7 +21,7 @@ export default function ApplicationDetails() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
@@ -136,6 +136,14 @@ export default function ApplicationDetails() {
               {formatDate(application.created_at)}
             </dd>
           </div>
+          {application.salary && (
+            <div>
+              <dt className="text-xs font-medium uppercase tracking-wide text-ink-faint">
+                Salary
+              </dt>
+              <dd className="mt-1 text-sm text-ink">{application.salary}</dd>
+            </div>
+          )}
           {application.job_url && (
             <div className="sm:col-span-2">
               <dt className="text-xs font-medium uppercase tracking-wide text-ink-faint">
@@ -153,6 +161,23 @@ export default function ApplicationDetails() {
               </dd>
             </div>
           )}
+          {application.skills && application.skills.length > 0 && (
+            <div className="sm:col-span-2">
+              <dt className="text-xs font-medium uppercase tracking-wide text-ink-faint">
+                Skills
+              </dt>
+              <dd className="mt-1.5 flex flex-wrap gap-1.5">
+                {application.skills.map((skill) => (
+                  <span
+                    key={skill}
+                    className="rounded-full bg-brand-50 px-2.5 py-1 text-xs font-medium text-brand-700"
+                  >
+                    {skill}
+                  </span>
+                ))}
+              </dd>
+            </div>
+          )}
           {application.notes && (
             <div className="sm:col-span-2">
               <dt className="text-xs font-medium uppercase tracking-wide text-ink-faint">
@@ -165,15 +190,6 @@ export default function ApplicationDetails() {
           )}
         </dl>
 
-        {deleteError && (
-          <div
-            role="alert"
-            className="mt-6 rounded-md border border-status-rejected-dot/30 bg-status-rejected-bg px-3 py-2 text-sm text-status-rejected-text"
-          >
-            {deleteError}
-          </div>
-        )}
-
         <div className="mt-6 flex items-center gap-3 border-t border-border pt-6">
           <Link
             to={`/applications/${application.id}/edit`}
@@ -182,42 +198,77 @@ export default function ApplicationDetails() {
             Edit
           </Link>
 
-          {!isConfirmingDelete ? (
-            <button
-              type="button"
-              onClick={() => setIsConfirmingDelete(true)}
-              className="rounded-md border border-status-rejected-dot/40 px-4 py-2 text-sm font-medium text-status-rejected-text transition-colors hover:bg-status-rejected-bg"
+          <button
+            type="button"
+            onClick={() => setIsDeleteModalOpen(true)}
+            className="rounded-md border border-status-rejected-dot/40 px-4 py-2 text-sm font-medium text-status-rejected-text transition-colors hover:bg-status-rejected-bg"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+
+      {isDeleteModalOpen && (
+        <div
+          className="fixed inset-0 z-20 flex items-center justify-center bg-ink/40 px-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-modal-title"
+          onClick={() => {
+            if (!isDeleting) setIsDeleteModalOpen(false);
+          }}
+        >
+          <div
+            className="w-full max-w-sm rounded-xl border border-border bg-surface p-6 shadow-lg"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2
+              id="delete-modal-title"
+              className="font-display text-lg font-semibold text-ink"
             >
-              Delete
-            </button>
-          ) : (
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-ink-muted">
-                Delete this application?
+              Confirm delete?
+            </h2>
+            <p className="mt-2 text-sm text-ink-muted">
+              This will permanently delete the application for{" "}
+              <span className="font-medium text-ink">
+                {application.position} at {application.company}
               </span>
+              . This can't be undone.
+            </p>
+
+            {deleteError && (
+              <div
+                role="alert"
+                className="mt-4 rounded-md border border-status-rejected-dot/30 bg-status-rejected-bg px-3 py-2 text-sm text-status-rejected-text"
+              >
+                {deleteError}
+              </div>
+            )}
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setIsDeleteModalOpen(false)}
+                disabled={isDeleting}
+                className="rounded-md border border-border px-4 py-2 text-sm font-medium text-ink-muted transition-colors hover:border-border-strong hover:text-ink disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                Cancel
+              </button>
               <button
                 type="button"
                 onClick={handleDelete}
                 disabled={isDeleting}
-                className="flex items-center gap-2 rounded-md bg-status-rejected-dot px-3 py-1.5 text-sm font-medium text-white transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-70"
+                className="flex items-center gap-2 rounded-md bg-status-rejected-dot px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-70"
               >
                 {isDeleting && (
                   <LoadingSpinner size="sm" className="text-white" />
                 )}
                 {isDeleting ? "Deleting..." : "Confirm delete"}
               </button>
-              <button
-                type="button"
-                onClick={() => setIsConfirmingDelete(false)}
-                disabled={isDeleting}
-                className="rounded-md px-3 py-1.5 text-sm font-medium text-ink-muted hover:text-ink"
-              >
-                Cancel
-              </button>
             </div>
-          )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

@@ -72,13 +72,13 @@ def login(user: UserCreate):
         result = cursor.fetchone()
 
     if result is None:
-        return {"error": "Invalid email or password"}
+        raise HTTPException(status_code=401, detail="Invalid email or password")
 
     user_id = result[0]
     password_hash = result[1]
 
     if not verify_password(user.password, password_hash):
-        return {"error": "Invalid email or password"}
+        raise HTTPException(status_code=401, detail="Invalid email or password")
 
     access_token = create_access_token(user_id)
 
@@ -94,17 +94,21 @@ def create_application(application: JobApplication,
         cursor.execute(
             """
             INSERT INTO applications
-                (user_id, company, position, location, status)
+                (user_id, company, position, location, status, job_url, notes, salary, skills)
             VALUES
-                (%s, %s, %s, %s, %s)
-            RETURNING id, user_id, company, position, location, status, created_at
+                (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING id, user_id, company, position, location, status, created_at, job_url, notes, salary, skills
             """,
             (
                 current_user_id,
                 application.company,
                 application.position,
                 application.location,
-                application.status
+                application.status,
+                application.job_url,
+                application.notes,
+                application.salary,
+                application.skills
             )
         )
 
@@ -118,7 +122,11 @@ def create_application(application: JobApplication,
         "position": result[3],
         "location": result[4],
         "status": result[5],
-        "created_at": result[6]
+        "created_at": result[6],
+        "job_url": result[7],
+        "notes": result[8],
+        "salary": result[9],
+        "skills": result[10]
     }
 @app.get("/api/applications")
 def get_applications(
@@ -127,7 +135,7 @@ def get_applications(
     with connection.cursor() as cursor:
         cursor.execute(
             """
-            SELECT id, user_id, company, position, location, status, created_at
+            SELECT id, user_id, company, position, location, status, created_at, job_url, notes, salary, skills
             FROM applications
             WHERE user_id = %s
             ORDER BY created_at DESC
@@ -145,7 +153,11 @@ def get_applications(
             "position": row[3],
             "location": row[4],
             "status": row[5],
-            "created_at": row[6]
+            "created_at": row[6],
+            "job_url": row[7],
+            "notes": row[8],
+            "salary": row[9],
+            "skills": row[10]
         }
         for row in applications
     ]
@@ -157,7 +169,7 @@ def get_application(
     with connection.cursor() as cursor:
         cursor.execute(
             """
-            SELECT id, user_id, company, position, location, status, created_at
+            SELECT id, user_id, company, position, location, status, created_at, job_url, notes, salary, skills
             FROM applications
             WHERE id = %s AND user_id = %s
             """,
@@ -167,7 +179,7 @@ def get_application(
         application = cursor.fetchone()
 
     if application is None:
-        return {"error": "Application not found"}
+        raise HTTPException(status_code=404, detail="Application not found")
 
     return {
         "id": application[0],
@@ -176,7 +188,11 @@ def get_application(
         "position": application[3],
         "location": application[4],
         "status": application[5],
-        "created_at": application[6]
+        "created_at": application[6],
+        "job_url": application[7],
+        "notes": application[8],
+        "salary": application[9],
+        "skills": application[10]
     }
 @app.patch("/api/applications/{application_id}")
 def update_application(
@@ -187,7 +203,7 @@ def update_application(
     updates = application.model_dump(exclude_none=True)
 
     if not updates:
-        return {"error": "No fields to update"}
+        raise HTTPException(status_code=400, detail="No fields to update")
 
     fields = []
     values = []
@@ -203,7 +219,7 @@ def update_application(
         UPDATE applications
         SET {", ".join(fields)}
         WHERE id = %s AND user_id = %s
-        RETURNING id, user_id, company, position, location, status, created_at
+        RETURNING id, user_id, company, position, location, status, created_at, job_url, notes, salary, skills
     """
 
     with connection.cursor() as cursor:
@@ -212,7 +228,7 @@ def update_application(
         connection.commit()
 
     if result is None:
-        return {"error": "Application not found"}
+        raise HTTPException(status_code=404, detail="Application not found")
 
     return {
         "id": result[0],
@@ -221,7 +237,11 @@ def update_application(
         "position": result[3],
         "location": result[4],
         "status": result[5],
-        "created_at": result[6]
+        "created_at": result[6],
+        "job_url": result[7],
+        "notes": result[8],
+        "salary": result[9],
+        "skills": result[10]
     }
 @app.delete("/api/applications/{application_id}")
 def delete_application(
@@ -242,7 +262,7 @@ def delete_application(
         connection.commit()
 
     if result is None:
-        return {"error": "Application not found"}
+        raise HTTPException(status_code=404, detail="Application not found")
 
     return {
         "message": "Application deleted",

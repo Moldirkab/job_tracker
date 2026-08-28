@@ -11,6 +11,10 @@ class JobApplication(BaseModel):
     position: str
     location: str
     status: str
+    job_url: str | None = None
+    notes: str | None = None
+    salary: str | None = None
+    skills: list[str] | None = None
 
 
 class ApplicationUpdate(BaseModel):
@@ -18,3 +22,7 @@ class ApplicationUpdate(BaseModel):
     position: str | None = None
     location: str | None = None
     status: str | None = None
+    job_url: str | None = None
+    notes: str | None = None
+    salary: str | None = None
+    skills: list[str] | None = None
