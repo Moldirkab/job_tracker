@@ -1,40 +1,16 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ApiError, createApplication } from "../services/api";
+import { ApiError, createApplication, importJobFromUrl } from "../services/api";
 import type { ApplicationStatus } from "../types/application";
 import LoadingSpinner from "../components/LoadingSpinner";
 
-interface MockExtraction {
+interface JobExtraction {
   company: string;
   position: string;
   location: string;
   salary: string;
   skills: string[];
 }
-
-const MOCK_POSTINGS: MockExtraction[] = [
-  {
-    company: "Acme Corp",
-    position: "Senior Frontend Engineer",
-    location: "Remote",
-    salary: "$120,000 – $150,000",
-    skills: ["React", "TypeScript", "GraphQL"],
-  },
-  {
-    company: "Northwind Systems",
-    position: "Backend Engineer, Platform",
-    location: "Berlin, Germany",
-    salary: "€65,000 – €80,000",
-    skills: ["Go", "PostgreSQL", "Kubernetes"],
-  },
-  {
-    company: "Solace Health",
-    position: "Full Stack Developer Intern",
-    location: "Austin, TX",
-    salary: "$28/hr",
-    skills: ["Python", "FastAPI", "React"],
-  },
-];
 
 const STATUS_OPTIONS: { value: ApplicationStatus; label: string }[] = [
   { value: "APPLIED", label: "Applied" },
@@ -50,7 +26,7 @@ export default function ImportApplication() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
 
-  const [extraction, setExtraction] = useState<MockExtraction | null>(null);
+  const [extraction, setExtraction] = useState<JobExtraction | null>(null);
   const [status, setStatus] = useState<ApplicationStatus>("APPLIED");
 
   const [isSaving, setIsSaving] = useState(false);
@@ -68,16 +44,25 @@ export default function ImportApplication() {
     setIsAnalyzing(true);
     setExtraction(null);
 
-    // Mocked AI extraction — no backend endpoint exists yet.
-    // This does not read the pasted URL; it returns a random sample posting
-    // so the preview → confirm → save flow can be tested end to end.
-    await new Promise((resolve) => setTimeout(resolve, 900));
-    const sample =
-      MOCK_POSTINGS[Math.floor(Math.random() * MOCK_POSTINGS.length)];
-
-    setExtraction(sample);
-    setStatus("APPLIED");
-    setIsAnalyzing(false);
+    try {
+      const result = await importJobFromUrl(url.trim());
+      setExtraction({
+        company: result.company,
+        position: result.position,
+        location: result.location,
+        salary: result.salary ?? "",
+        skills: result.skills,
+      });
+      setStatus("APPLIED");
+    } catch (err) {
+      setAnalyzeError(
+        err instanceof ApiError
+          ? err.message
+          : "Couldn't analyze that job posting.",
+      );
+    } finally {
+      setIsAnalyzing(false);
+    }
   }
 
   function handleCancel() {
@@ -158,10 +143,6 @@ export default function ImportApplication() {
             {isAnalyzing ? "Analyzing..." : "Analyze Job"}
           </button>
         </div>
-        <p className="mt-2 text-xs text-ink-faint">
-          This is a mocked preview for now — it doesn't read the actual page
-          yet.
-        </p>
       </div>
 
       {extraction && (

@@ -9,7 +9,9 @@ export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
   const { login } = useAuth();
-  const justRegistered = Boolean((location.state as { justRegistered?: boolean } | null)?.justRegistered);
+  const justRegistered = Boolean(
+    (location.state as { justRegistered?: boolean } | null)?.justRegistered,
+  );
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -35,11 +37,18 @@ export default function Login() {
     setError(null);
     setIsSubmitting(true);
     try {
-      const { access_token } = await loginRequest(email.trim(), password);
-      login(access_token);
+      const { access_token, refresh_token } = await loginRequest(
+        email.trim(),
+        password,
+      );
+      login(access_token, refresh_token);
       navigate("/dashboard", { replace: true });
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.");
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : "Something went wrong. Please try again.",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -52,8 +61,12 @@ export default function Login() {
           <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand-500 font-display text-base font-semibold text-white">
             JT
           </span>
-          <h1 className="font-display text-xl font-semibold text-ink">Welcome back</h1>
-          <p className="text-sm text-ink-muted">Log in to keep tracking your applications</p>
+          <h1 className="font-display text-xl font-semibold text-ink">
+            Welcome back
+          </h1>
+          <p className="text-sm text-ink-muted">
+            Log in to keep tracking your applications
+          </p>
         </div>
 
         <form
@@ -77,7 +90,10 @@ export default function Login() {
           )}
 
           <div className="mb-4">
-            <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-ink">
+            <label
+              htmlFor="email"
+              className="mb-1.5 block text-sm font-medium text-ink"
+            >
               Email
             </label>
             <input
@@ -92,7 +108,10 @@ export default function Login() {
           </div>
 
           <div className="mb-6">
-            <label htmlFor="password" className="mb-1.5 block text-sm font-medium text-ink">
+            <label
+              htmlFor="password"
+              className="mb-1.5 block text-sm font-medium text-ink"
+            >
               Password
             </label>
             <input
@@ -111,14 +130,19 @@ export default function Login() {
             disabled={isSubmitting}
             className="flex w-full items-center justify-center gap-2 rounded-md bg-brand-500 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-70"
           >
-            {isSubmitting && <LoadingSpinner size="sm" className="text-white" />}
+            {isSubmitting && (
+              <LoadingSpinner size="sm" className="text-white" />
+            )}
             {isSubmitting ? "Logging in..." : "Log in"}
           </button>
         </form>
 
         <p className="mt-6 text-center text-sm text-ink-muted">
           Don't have an account?{" "}
-          <Link to="/register" className="font-medium text-brand-600 hover:text-brand-700">
+          <Link
+            to="/register"
+            className="font-medium text-brand-600 hover:text-brand-700"
+          >
             Register
           </Link>
         </p>

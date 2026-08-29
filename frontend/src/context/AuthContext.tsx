@@ -1,25 +1,27 @@
 import { createContext, useContext, useState, useCallback } from "react";
 import type { ReactNode } from "react";
-import { clearToken, getToken, setToken as persistToken } from "../services/api";
+import { getToken, logout as logoutRequest, setTokens } from "../services/api";
 
 interface AuthContextValue {
   isAuthenticated: boolean;
-  login: (token: string) => void;
-  logout: () => void;
+  login: (accessToken: string, refreshToken: string) => void;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => Boolean(getToken()));
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() =>
+    Boolean(getToken()),
+  );
 
-  const login = useCallback((token: string) => {
-    persistToken(token);
+  const login = useCallback((accessToken: string, refreshToken: string) => {
+    setTokens(accessToken, refreshToken);
     setIsAuthenticated(true);
   }, []);
 
-  const logout = useCallback(() => {
-    clearToken();
+  const logout = useCallback(async () => {
+    await logoutRequest();
     setIsAuthenticated(false);
   }, []);
 

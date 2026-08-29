@@ -1,12 +1,17 @@
 import psycopg
 from fastapi import FastAPI, Depends, HTTPException
 from app.database import connection
-from app.models import UserCreate, JobApplication, ApplicationUpdate
 from fastapi.middleware.cors import CORSMiddleware
+from app.models import UserCreate, JobApplication, ApplicationUpdate, ImportRequest, ImportPreview, RefreshRequest, TokenPair
+from app.ai_import import extract_job_info
+from datetime import datetime, timedelta, timezone
 from app.security import (
     hash_password,
     verify_password,
-    create_access_token
+    create_access_token,
+    create_refresh_token,
+    hash_refresh_token,
+    REFRESH_TOKEN_EXPIRE_DAYS
 )
 from app.auth import get_current_user
 
@@ -81,11 +86,92 @@ def login(user: UserCreate):
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
     access_token = create_access_token(user_id)
+    raw_refresh_token, refresh_token_hash = create_refresh_token()
+    expires_at = datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            INSERT INTO refresh_tokens (user_id, token_hash, expires_at)
+            VALUES (%s, %s, %s)
+            """,
+            (user_id, refresh_token_hash, expires_at)
+        )
+        connection.commit()
 
     return {
         "access_token": access_token,
+        "refresh_token": raw_refresh_token,
         "token_type": "bearer"
     }
+
+@app.post("/api/refresh", response_model=TokenPair)
+def refresh_token(request: RefreshRequest):
+    incoming_hash = hash_refresh_token(request.refresh_token)
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT id, user_id, expires_at, revoked
+            FROM refresh_tokens
+            WHERE token_hash = %s
+            """,
+            (incoming_hash,)
+        )
+        row = cursor.fetchone()
+
+    if row is None:
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
+
+    token_id, user_id, expires_at, revoked = row
+
+    if revoked:
+        raise HTTPException(status_code=401, detail="Refresh token has been revoked")
+
+    if expires_at < datetime.now(timezone.utc):
+        raise HTTPException(status_code=401, detail="Refresh token has expired")
+
+    # Rotation: revoke the used token, issue a brand new pair.
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "UPDATE refresh_tokens SET revoked = TRUE WHERE id = %s",
+            (token_id,)
+        )
+        connection.commit()
+
+    new_access_token = create_access_token(user_id)
+    new_raw_refresh_token, new_refresh_token_hash = create_refresh_token()
+    new_expires_at = datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            INSERT INTO refresh_tokens (user_id, token_hash, expires_at)
+            VALUES (%s, %s, %s)
+            """,
+            (user_id, new_refresh_token_hash, new_expires_at)
+        )
+        connection.commit()
+
+    return {
+        "access_token": new_access_token,
+        "refresh_token": new_raw_refresh_token,
+        "token_type": "bearer"
+    }
+
+
+@app.post("/api/logout")
+def logout(request: RefreshRequest):
+    incoming_hash = hash_refresh_token(request.refresh_token)
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "UPDATE refresh_tokens SET revoked = TRUE WHERE token_hash = %s",
+            (incoming_hash,)
+        )
+        connection.commit()
+
+    return {"message": "Logged out"}
 
 @app.post("/api/applications")
 def create_application(application: JobApplication, 
@@ -128,6 +214,14 @@ def create_application(application: JobApplication,
         "salary": result[9],
         "skills": result[10]
     }
+
+@app.post("/api/applications/import", response_model=ImportPreview)
+def import_application(
+    request: ImportRequest,
+    current_user_id: int = Depends(get_current_user)
+):
+    return extract_job_info(request.url)
+
 @app.get("/api/applications")
 def get_applications(
     current_user_id: int = Depends(get_current_user)

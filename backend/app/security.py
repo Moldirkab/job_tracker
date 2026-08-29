@@ -2,11 +2,14 @@ from datetime import datetime, timedelta, timezone
 
 from jose import jwt
 import bcrypt
+import hashlib
+import secrets
 
 
 SECRET_KEY = "change-this-later"
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
+REFRESH_TOKEN_EXPIRE_DAYS = 7
 
 
 def hash_password(password: str) -> str:
@@ -38,3 +41,12 @@ def create_access_token(user_id: int) -> str:
         SECRET_KEY,
         algorithm=ALGORITHM
     )
+def create_refresh_token() -> tuple[str, str]:
+    """Returns (raw_token_to_send_to_client, hash_to_store_in_db)."""
+    raw_token = secrets.token_urlsafe(48)
+    token_hash = hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
+    return raw_token, token_hash
+
+
+def hash_refresh_token(raw_token: str) -> str:
+    return hashlib.sha256(raw_token.encode("utf-8")).hexdigest()

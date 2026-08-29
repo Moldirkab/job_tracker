@@ -7,6 +7,7 @@ import type {
 
 const BASE_URL = "http://127.0.0.1:8000";
 const TOKEN_KEY = "token";
+const REFRESH_TOKEN_KEY = "refresh_token";
 
 // ---------------------------------------------------------------------------
 // Token storage
@@ -16,12 +17,18 @@ export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
 }
 
-export function setToken(token: string): void {
-  localStorage.setItem(TOKEN_KEY, token);
+export function getRefreshToken(): string | null {
+  return localStorage.getItem(REFRESH_TOKEN_KEY);
+}
+
+export function setTokens(accessToken: string, refreshToken: string): void {
+  localStorage.setItem(TOKEN_KEY, accessToken);
+  localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
 }
 
 export function clearToken(): void {
   localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(REFRESH_TOKEN_KEY);
 }
 
 // ---------------------------------------------------------------------------
@@ -39,6 +46,7 @@ export class ApiError extends Error {
     this.details = details;
   }
 }
+
 function friendlyMessageForStatus(status: number, fallback?: string, isAuthEndpoint?: boolean): string {
   switch (status) {
     case 401:
@@ -58,6 +66,47 @@ function friendlyMessageForStatus(status: number, fallback?: string, isAuthEndpo
 }
 
 // ---------------------------------------------------------------------------
+// Refresh coordination — ensures only one refresh call happens at a time,
+// no matter how many requests hit a 401 simultaneously.
+// ---------------------------------------------------------------------------
+
+let refreshPromise: Promise<boolean> | null = null;
+
+async function performRefresh(): Promise<boolean> {
+  const currentRefreshToken = getRefreshToken();
+  if (!currentRefreshToken) return false;
+
+  try {
+    const response = await fetch(`${BASE_URL}/api/refresh`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refresh_token: currentRefreshToken }),
+    });
+
+    if (!response.ok) {
+      clearToken();
+      return false;
+    }
+
+    const data = (await response.json()) as AuthResponse;
+    setTokens(data.access_token, data.refresh_token);
+    return true;
+  } catch {
+    clearToken();
+    return false;
+  }
+}
+
+function refreshAccessToken(): Promise<boolean> {
+  if (!refreshPromise) {
+    refreshPromise = performRefresh().finally(() => {
+      refreshPromise = null;
+    });
+  }
+  return refreshPromise;
+}
+
+// ---------------------------------------------------------------------------
 // Core request helper
 // ---------------------------------------------------------------------------
 
@@ -65,9 +114,10 @@ interface RequestOptions {
   method?: "GET" | "POST" | "PATCH" | "DELETE";
   body?: unknown;
   auth?: boolean;
+  skipRefresh?: boolean;
 }
 
-async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+async function rawRequest<T>(path: string, options: RequestOptions): Promise<{ response: Response; payload: unknown }> {
   const { method = "GET", body, auth = true } = options;
 
   const headers: Record<string, string> = {
@@ -92,38 +142,66 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     throw new ApiError(0, "Can't reach the server. Check your connection and try again.");
   }
 
+  let payload: unknown = null;
+  if (response.status !== 204) {
+    const text = await response.text();
+    if (text) {
+      try {
+        payload = JSON.parse(text);
+      } catch {
+        payload = null;
+      }
+    }
+  }
+
+  return { response, payload };
+}
+
+async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const { auth = true, skipRefresh = false } = options;
+
+  const { response, payload } = await rawRequest<T>(path, options);
+
   if (response.status === 204) {
     return undefined as T;
   }
 
-  let payload: unknown = null;
-  const text = await response.text();
-  if (text) {
-    try {
-      payload = JSON.parse(text);
-    } catch {
-      payload = null;
+  if (response.ok) {
+    return payload as T;
+  }
+
+  // Only attempt a silent refresh for protected requests that failed with 401
+  // (never for login/register itself, and never recursively during a refresh).
+  if (response.status === 401 && auth && !skipRefresh) {
+    const refreshed = await refreshAccessToken();
+    if (refreshed) {
+      const retry = await rawRequest<T>(path, options);
+      if (retry.response.ok) {
+        return retry.payload as T;
+      }
+      // Fall through to error handling using the retry's response below.
+      return handleErrorResponse(retry.response, retry.payload, auth);
     }
   }
 
-  if (!response.ok) {
-    const detailMessage =
-      payload && typeof payload === "object" && payload !== null && "detail" in payload
-        ? String((payload as { detail: unknown }).detail)
-        : undefined;
+  return handleErrorResponse(response, payload, auth);
+}
 
-    if (response.status === 401 && auth) {
-      clearToken();
-    }
+function handleErrorResponse(response: Response, payload: unknown, auth: boolean): never {
+  const detailMessage =
+    payload && typeof payload === "object" && payload !== null && "detail" in payload
+      ? String((payload as { detail: unknown }).detail)
+      : undefined;
 
-    throw new ApiError(
-      response.status,
-      friendlyMessageForStatus(response.status, detailMessage, !auth),
-      payload
-    );
+  if (response.status === 401 && auth) {
+    clearToken();
   }
 
-  return payload as T;
+  throw new ApiError(
+    response.status,
+    friendlyMessageForStatus(response.status, detailMessage, !auth),
+    payload
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -146,9 +224,27 @@ export function login(email: string, password: string): Promise<AuthResponse> {
   });
 }
 
+export async function logout(): Promise<void> {
+  const currentRefreshToken = getRefreshToken();
+  clearToken();
+
+  if (!currentRefreshToken) return;
+
+  try {
+    await fetch(`${BASE_URL}/api/logout`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refresh_token: currentRefreshToken }),
+    });
+  } catch {
+    // Best-effort — the token is already cleared locally either way.
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Application endpoints
 // ---------------------------------------------------------------------------
+
 export function getApplications(): Promise<Application[]> {
   return request("/api/applications");
 }
@@ -177,5 +273,20 @@ export function updateApplication(
 export function deleteApplication(id: number | string): Promise<void> {
   return request(`/api/applications/${id}`, {
     method: "DELETE",
+  });
+}
+
+export interface ImportPreview {
+  company: string;
+  position: string;
+  location: string;
+  salary: string | null;
+  skills: string[];
+}
+
+export function importJobFromUrl(url: string): Promise<ImportPreview> {
+  return request("/api/applications/import", {
+    method: "POST",
+    body: { url },
   });
 }
