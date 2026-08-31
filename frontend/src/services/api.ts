@@ -5,7 +5,7 @@ import type {
   UpdateApplicationInput,
 } from "../types/application";
 
-const BASE_URL = "http://127.0.0.1:8000";
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
 const TOKEN_KEY = "token";
 const REFRESH_TOKEN_KEY = "refresh_token";
 
@@ -117,7 +117,7 @@ interface RequestOptions {
   skipRefresh?: boolean;
 }
 
-async function rawRequest<T>(path: string, options: RequestOptions): Promise<{ response: Response; payload: unknown }> {
+async function rawRequest(path: string, options: RequestOptions): Promise<{ response: Response; payload: unknown }> {
   const { method = "GET", body, auth = true } = options;
 
   const headers: Record<string, string> = {
@@ -160,7 +160,7 @@ async function rawRequest<T>(path: string, options: RequestOptions): Promise<{ r
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { auth = true, skipRefresh = false } = options;
 
-  const { response, payload } = await rawRequest<T>(path, options);
+  const { response, payload } = await rawRequest(path, options);
 
   if (response.status === 204) {
     return undefined as T;
@@ -175,7 +175,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   if (response.status === 401 && auth && !skipRefresh) {
     const refreshed = await refreshAccessToken();
     if (refreshed) {
-      const retry = await rawRequest<T>(path, options);
+      const retry = await rawRequest(path, options);
       if (retry.response.ok) {
         return retry.payload as T;
       }
