@@ -4,6 +4,7 @@ backend/__pycache__/
 backend/**/*.pyc
 
 # Environment variables
+.env
 backend/.env
 
 # Node

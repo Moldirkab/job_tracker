@@ -4,9 +4,12 @@ from jose import jwt
 import bcrypt
 import hashlib
 import secrets
+import os
 
+SECRET_KEY = os.environ.get("SECRET_KEY")
 
-SECRET_KEY = "change-this-later"
+if not SECRET_KEY:
+    raise RuntimeError("SECRET_KEY environment variable is not set")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 REFRESH_TOKEN_EXPIRE_DAYS = 7
