@@ -1,4 +1,4 @@
-import psycopg
+import psycopg, os
 from fastapi import FastAPI, Depends, HTTPException, Request
 from app.database import connection
 from fastapi.middleware.cors import CORSMiddleware
@@ -32,7 +32,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-limiter = Limiter(key_func=get_remote_address)
+
+RATE_LIMITING_ENABLED = os.environ.get("RATE_LIMITING_ENABLED", "true").lower() == "true"
+
+limiter = Limiter(key_func=get_remote_address, enabled=RATE_LIMITING_ENABLED)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 

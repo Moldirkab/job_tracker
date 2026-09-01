@@ -8,6 +8,7 @@ os.environ["DB_HOST"] = "127.0.0.1"
 os.environ["DB_PORT"] = "5432"
 os.environ["SECRET_KEY"] = "test-secret-key-not-for-production"
 os.environ["GEMINI_API_KEY"] = "test-key-unused-in-these-tests"
+os.environ["RATE_LIMITING_ENABLED"] = "false"
 
 import pytest
 from fastapi.testclient import TestClient

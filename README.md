@@ -13,6 +13,7 @@ A full-stack job application tracker with JWT authentication, refresh token rota
 
 - JWT authentication with short-lived access tokens and rotating refresh tokens
 - Password reset via email (single-use, time-limited reset tokens)
+- Rate limiting on login, registration, password reset, and AI import
 - Full CRUD for job applications
 - Search, filter by status, and sort
 - AI-powered job import — paste a URL, Gemini extracts company, position, location, salary, and skills; user reviews and confirms before saving
@@ -37,7 +38,7 @@ A full-stack job application tracker with JWT authentication, refresh token rota
 job-tracker/
 ├── backend/
 │   ├── app/
-│   │   ├── main.py          # FastAPI app + routes
+│   │   ├── main.py          # FastAPI app + routes, rate limiting
 │   │   ├── models.py        # Pydantic schemas
 │   │   ├── security.py      # Password hashing, JWT, refresh tokens
 │   │   ├── auth.py          # Auth dependency
@@ -60,20 +61,22 @@ job-tracker/
 
 ## API reference
 
-| Method | Endpoint                      | Description                             | Auth |
-| ------ | ----------------------------- | --------------------------------------- | ---- |
-| POST   | `/api/users`                  | Register a new user                     | No   |
-| POST   | `/api/login`                  | Log in, returns access + refresh tokens | No   |
-| POST   | `/api/refresh`                | Exchange a refresh token for a new pair | No   |
-| POST   | `/api/logout`                 | Revoke a refresh token                  | No   |
-| POST   | `/api/password-reset/request` | Request a password reset email          | No   |
-| POST   | `/api/password-reset/confirm` | Reset password using a valid token      | No   |
-| GET    | `/api/applications`           | List the current user's applications    | Yes  |
-| POST   | `/api/applications`           | Create an application                   | Yes  |
-| GET    | `/api/applications/{id}`      | Get one application                     | Yes  |
-| PATCH  | `/api/applications/{id}`      | Update an application                   | Yes  |
-| DELETE | `/api/applications/{id}`      | Delete an application                   | Yes  |
-| POST   | `/api/applications/import`    | AI-extract job details from a URL       | Yes  |
+| Method | Endpoint                      | Description                             | Auth | Rate limit |
+| ------ | ----------------------------- | --------------------------------------- | ---- | ---------- |
+| POST   | `/api/users`                  | Register a new user                     | No   | 10/hour    |
+| POST   | `/api/login`                  | Log in, returns access + refresh tokens | No   | 5/minute   |
+| POST   | `/api/refresh`                | Exchange a refresh token for a new pair | No   | —          |
+| POST   | `/api/logout`                 | Revoke a refresh token                  | No   | —          |
+| POST   | `/api/password-reset/request` | Request a password reset email          | No   | 5/hour     |
+| POST   | `/api/password-reset/confirm` | Reset password using a valid token      | No   | —          |
+| GET    | `/api/applications`           | List the current user's applications    | Yes  | —          |
+| POST   | `/api/applications`           | Create an application                   | Yes  | —          |
+| GET    | `/api/applications/{id}`      | Get one application                     | Yes  | —          |
+| PATCH  | `/api/applications/{id}`      | Update an application                   | Yes  | —          |
+| DELETE | `/api/applications/{id}`      | Delete an application                   | Yes  | —          |
+| POST   | `/api/applications/import`    | AI-extract job details from a URL       | Yes  | 10/hour    |
+
+Rate limits are enforced per client IP (via `slowapi`) using a fixed-window algorithm and return `429 Too Many Requests` once exceeded.
 
 ## Running locally
 
@@ -124,4 +127,4 @@ cd backend
 pytest
 ```
 
-Requires a separate `job_tracker_test` database (see `sql/000_initial_schema.sql`) and a `LOCAL_TEST_DB_PASSWORD` value in `.env`.
+Requires a separate `job_tracker_test` database (see `sql/000_initial_schema.sql`) and a `TEST_DB_PASSWORD` value in `.env`.
