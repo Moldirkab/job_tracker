@@ -49,7 +49,7 @@ jobs:
         env:
           DB_NAME: job_tracker_test
           DB_USER: postgres
-          DB_PASSWORD: postgres
+          LOCAL_TEST_DB_PASSWORD: postgres
           DB_HOST: 127.0.0.1
           DB_PORT: 5432
           SECRET_KEY: ci-test-secret-key-not-for-production
