@@ -1,26 +1,25 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
-import { login as loginRequest, ApiError } from "../services/api";
-import { useAuth } from "../context/AuthContext";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { ApiError, confirmPasswordReset } from "../services/api";
 import LoadingSpinner from "../components/LoadingSpinner";
 
-export default function Login() {
+export default function ResetPassword() {
   const navigate = useNavigate();
-  const location = useLocation();
-  const { login } = useAuth();
-  const justRegistered = Boolean(
-    (location.state as { justRegistered?: boolean } | null)?.justRegistered,
-  );
+  const [searchParams] = useSearchParams();
+  const token = searchParams.get("token");
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   function validate(): string | null {
-    if (!email.trim()) return "Enter your email address.";
-    if (!password) return "Enter your password.";
+    if (!token) return "This reset link is invalid or missing a token.";
+    if (!newPassword) return "Choose a new password.";
+    if (newPassword.length < 8)
+      return "Password must be at least 8 characters.";
+    if (newPassword !== confirmPassword) return "Passwords don't match.";
     return null;
   }
 
@@ -37,12 +36,8 @@ export default function Login() {
     setError(null);
     setIsSubmitting(true);
     try {
-      const { access_token, refresh_token } = await loginRequest(
-        email.trim(),
-        password,
-      );
-      login(access_token, refresh_token);
-      navigate("/dashboard", { replace: true });
+      await confirmPasswordReset(token!, newPassword);
+      navigate("/login", { replace: true, state: { justReset: true } });
     } catch (err) {
       setError(
         err instanceof ApiError
@@ -54,6 +49,27 @@ export default function Login() {
     }
   }
 
+  if (!token) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-canvas px-4">
+        <div className="w-full max-w-sm text-center">
+          <div className="rounded-xl border border-border bg-surface p-6 shadow-sm">
+            <p className="text-sm text-ink">
+              This reset link is invalid or missing a token. Please request a
+              new one.
+            </p>
+            <Link
+              to="/forgot-password"
+              className="mt-4 inline-block text-sm font-medium text-brand-600 hover:text-brand-700"
+            >
+              Request a new link
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-canvas px-4">
       <div className="w-full max-w-sm">
@@ -62,11 +78,8 @@ export default function Login() {
             JT
           </span>
           <h1 className="font-display text-xl font-semibold text-ink">
-            Welcome back
+            Set a new password
           </h1>
-          <p className="text-sm text-ink-muted">
-            Log in to keep tracking your applications
-          </p>
         </div>
 
         <form
@@ -83,54 +96,42 @@ export default function Login() {
             </div>
           )}
 
-          {!error && justRegistered && (
-            <div className="mb-4 rounded-md border border-status-offer-dot/30 bg-status-offer-bg px-3 py-2 text-sm text-status-offer-text">
-              Account created. Log in to continue.
-            </div>
-          )}
-
           <div className="mb-4">
             <label
-              htmlFor="email"
+              htmlFor="newPassword"
               className="mb-1.5 block text-sm font-medium text-ink"
             >
-              Email
+              New password
             </label>
             <input
-              id="email"
-              type="email"
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              id="newPassword"
+              type="password"
+              autoComplete="new-password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
               className="w-full rounded-md border border-border-strong bg-white px-3 py-2 text-sm text-ink outline-none placeholder:text-ink-faint focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
-              placeholder="you@example.com"
+              placeholder="At least 8 characters"
             />
           </div>
+
           <div className="mb-6">
             <label
-              htmlFor="password"
+              htmlFor="confirmPassword"
               className="mb-1.5 block text-sm font-medium text-ink"
             >
-              Password
+              Confirm new password
             </label>
             <input
-              id="password"
+              id="confirmPassword"
               type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="new-password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
               className="w-full rounded-md border border-border-strong bg-white px-3 py-2 text-sm text-ink outline-none placeholder:text-ink-faint focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
-              placeholder="••••••••"
+              placeholder="Re-enter your new password"
             />
-            <div className="mt-2 text-right">
-              <Link
-                to="/forgot-password"
-                className="text-sm font-medium text-brand-600 hover:text-brand-700"
-              >
-                Forgot password?
-              </Link>
-            </div>
           </div>
+
           <button
             type="submit"
             disabled={isSubmitting}
@@ -139,19 +140,9 @@ export default function Login() {
             {isSubmitting && (
               <LoadingSpinner size="sm" className="text-white" />
             )}
-            {isSubmitting ? "Logging in..." : "Log in"}
+            {isSubmitting ? "Updating..." : "Update password"}
           </button>
         </form>
-
-        <p className="mt-6 text-center text-sm text-ink-muted">
-          Don't have an account?{" "}
-          <Link
-            to="/register"
-            className="font-medium text-brand-600 hover:text-brand-700"
-          >
-            Register
-          </Link>
-        </p>
       </div>
     </div>
   );

@@ -2,7 +2,7 @@ import psycopg
 from fastapi import FastAPI, Depends, HTTPException
 from app.database import connection
 from fastapi.middleware.cors import CORSMiddleware
-from app.models import UserCreate, JobApplication, ApplicationUpdate, ImportRequest, ImportPreview, RefreshRequest, TokenPair
+from app.models import UserCreate, JobApplication, ApplicationUpdate, ImportRequest, ImportPreview, RefreshRequest, TokenPair,PasswordResetRequest, PasswordResetConfirm
 from app.ai_import import extract_job_info
 from datetime import datetime, timedelta, timezone
 from app.security import (
@@ -11,9 +11,12 @@ from app.security import (
     create_access_token,
     create_refresh_token,
     hash_refresh_token,
+    create_password_reset_token,
+    hash_password_reset_token,
     REFRESH_TOKEN_EXPIRE_DAYS
 )
 from app.auth import get_current_user
+from app.email import send_password_reset_email
 
 app = FastAPI()
 app.add_middleware(
@@ -365,3 +368,86 @@ def delete_application(
         "message": "Application deleted",
         "id": result[0]
     }
+
+PASSWORD_RESET_EXPIRE_MINUTES = 30
+
+
+@app.post("/api/password-reset/request")
+def request_password_reset(request: PasswordResetRequest):
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT id FROM users WHERE email = %s", (request.email,))
+        result = cursor.fetchone()
+
+    generic_response = {"message": "If that email is registered, a reset link has been sent."}
+
+    if result is None:
+        return generic_response
+
+    user_id = result[0]
+    raw_token, token_hash = create_password_reset_token()
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=PASSWORD_RESET_EXPIRE_MINUTES)
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            INSERT INTO password_reset_tokens (user_id, token_hash, expires_at)
+            VALUES (%s, %s, %s)
+            """,
+            (user_id, token_hash, expires_at)
+        )
+        connection.commit()
+
+    try:
+        send_password_reset_email(request.email, raw_token)
+    except Exception as e:
+        print(f"EMAIL SEND ERROR: {type(e).__name__}: {e}")
+        
+
+    return generic_response
+
+
+@app.post("/api/password-reset/confirm")
+def confirm_password_reset(request: PasswordResetConfirm):
+    incoming_hash = hash_password_reset_token(request.token)
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT id, user_id, expires_at, used
+            FROM password_reset_tokens
+            WHERE token_hash = %s
+            """,
+            (incoming_hash,)
+        )
+        row = cursor.fetchone()
+
+    if row is None:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset link")
+
+    token_id, user_id, expires_at, used = row
+
+    if used:
+        raise HTTPException(status_code=400, detail="This reset link has already been used")
+
+    if expires_at < datetime.now(timezone.utc):
+        raise HTTPException(status_code=400, detail="This reset link has expired")
+
+    new_password_hash = hash_password(request.new_password)
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "UPDATE users SET password_hash = %s WHERE id = %s",
+            (new_password_hash, user_id)
+        )
+        cursor.execute(
+            "UPDATE password_reset_tokens SET used = TRUE WHERE id = %s",
+            (token_id,)
+        )
+    
+        cursor.execute(
+            "UPDATE refresh_tokens SET revoked = TRUE WHERE user_id = %s",
+            (user_id,)
+        )
+        connection.commit()
+
+    return {"message": "Password updated successfully"}

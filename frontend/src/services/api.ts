@@ -242,6 +242,26 @@ export async function logout(): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// Reset password endpoints
+// ---------------------------------------------------------------------------
+
+export function requestPasswordReset(email: string): Promise<{ message: string }> {
+  return request("/api/password-reset/request", {
+    method: "POST",
+    body: { email },
+    auth: false,
+  });
+}
+
+export function confirmPasswordReset(token: string, newPassword: string): Promise<{ message: string }> {
+  return request("/api/password-reset/confirm", {
+    method: "POST",
+    body: { token, new_password: newPassword },
+    auth: false,
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Application endpoints
 // ---------------------------------------------------------------------------
 

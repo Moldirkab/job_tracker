@@ -9,6 +9,8 @@ import AddApplication from "./pages/AddApplication";
 import ApplicationDetails from "./pages/ApplicationDetails";
 import EditApplication from "./pages/EditApplication";
 import ImportApplication from "./pages/ImportApplication";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 
 export default function App() {
   return (
@@ -17,6 +19,8 @@ export default function App() {
         {/* Public routes */}
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
 
         {/* Protected routes */}
         <Route element={<ProtectedRoute />}>

@@ -1,13 +1,13 @@
 import os
 from dotenv import load_dotenv
 load_dotenv()
-os.environ.setdefault("DB_NAME", "job_tracker_test")
-os.environ.setdefault("DB_USER", "postgres")
-os.environ.setdefault("DB_PASSWORD", os.environ.get("LOCAL_TEST_DB_PASSWORD", ""))
-os.environ.setdefault("DB_HOST", "127.0.0.1")
-os.environ.setdefault("DB_PORT", "5432")
-os.environ.setdefault("SECRET_KEY", "test-secret-key-not-for-production")
-os.environ.setdefault("GEMINI_API_KEY", "test-key-unused-in-these-tests")
+os.environ["DB_NAME"] = "job_tracker_test"
+os.environ["DB_USER"] = "postgres"
+os.environ["DB_PASSWORD"] = os.environ.get("LOCAL_TEST_DB_PASSWORD", "")
+os.environ["DB_HOST"] = "127.0.0.1"
+os.environ["DB_PORT"] = "5432"
+os.environ["SECRET_KEY"] = "test-secret-key-not-for-production"
+os.environ["GEMINI_API_KEY"] = "test-key-unused-in-these-tests"
 
 import pytest
 from fastapi.testclient import TestClient
