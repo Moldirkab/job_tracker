@@ -1,5 +1,6 @@
 import os
 import smtplib
+import socket
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
@@ -23,6 +24,13 @@ def send_password_reset_email(to_email: str, raw_token: str) -> None:
     """
     message.attach(MIMEText(html_body, "html"))
 
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+    # Force IPv4 — some cloud hosts (Render included) lack outbound IPv6
+    # routing, and smtplib can otherwise pick an IPv6 address for
+    # smtp.gmail.com and fail with "Network is unreachable" before the
+    # SMTP handshake even begins.
+    ipv4_address = socket.getaddrinfo("smtp.gmail.com", 465, socket.AF_INET)[0][4][0]
+
+    with smtplib.SMTP_SSL(ipv4_address, 465) as server:
+        server.ehlo("smtp.gmail.com")
         server.login(GMAIL_ADDRESS, GMAIL_APP_PASSWORD)
         server.sendmail(GMAIL_ADDRESS, [to_email], message.as_string())
