@@ -58,6 +58,8 @@ function friendlyMessageForStatus(status: number, fallback?: string, isAuthEndpo
       return "We couldn't find what you were looking for.";
     case 422:
       return fallback || "Some of the information provided isn't valid.";
+    case 429:
+      return "Too many attempts. Please wait a moment and try again.";  
     case 500:
       return "Something went wrong on our end. Please try again shortly.";
     default:

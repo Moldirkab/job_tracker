@@ -1,5 +1,5 @@
 import psycopg
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, Request
 from app.database import connection
 from fastapi.middleware.cors import CORSMiddleware
 from app.models import UserCreate, JobApplication, ApplicationUpdate, ImportRequest, ImportPreview, RefreshRequest, TokenPair,PasswordResetRequest, PasswordResetConfirm
@@ -17,6 +17,9 @@ from app.security import (
 )
 from app.auth import get_current_user
 from app.email import send_password_reset_email
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 app = FastAPI()
 app.add_middleware(
@@ -29,6 +32,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 @app.get("/")
 def root():
@@ -36,7 +42,8 @@ def root():
 
 
 @app.post("/api/users")
-def create_user(user: UserCreate):
+@limiter.limit("10/hour")
+def create_user(request:Request, user: UserCreate):
     password_hash = hash_password(user.password)
 
     try:
@@ -69,7 +76,8 @@ def create_user(user: UserCreate):
 
 
 @app.post("/api/login")
-def login(user: UserCreate):
+@limiter.limit("5/minute")
+def login(request:Request,user: UserCreate):
     with connection.cursor() as cursor:
         cursor.execute(
             """
@@ -222,11 +230,13 @@ def create_application(application: JobApplication,
     }
 
 @app.post("/api/applications/import", response_model=ImportPreview)
+@limiter.limit("10/hour")
 def import_application(
-    request: ImportRequest,
+    request: Request,
+    import_request: ImportRequest,
     current_user_id: int = Depends(get_current_user)
 ):
-    return extract_job_info(request.url)
+    return extract_job_info(import_request.url)
 
 @app.get("/api/applications")
 def get_applications(
@@ -373,9 +383,10 @@ PASSWORD_RESET_EXPIRE_MINUTES = 30
 
 
 @app.post("/api/password-reset/request")
-def request_password_reset(request: PasswordResetRequest):
+@limiter.limit("5/hour")
+def request_password_reset(request:Request, reset_request: PasswordResetRequest):
     with connection.cursor() as cursor:
-        cursor.execute("SELECT id FROM users WHERE email = %s", (request.email,))
+        cursor.execute("SELECT id FROM users WHERE email = %s", (reset_request.email,))
         result = cursor.fetchone()
 
     generic_response = {"message": "If that email is registered, a reset link has been sent."}
@@ -398,7 +409,7 @@ def request_password_reset(request: PasswordResetRequest):
         connection.commit()
 
     try:
-        send_password_reset_email(request.email, raw_token)
+        send_password_reset_email(reset_request.email, raw_token)
     except Exception as e:
         print(f"EMAIL SEND ERROR: {type(e).__name__}: {e}")
         
