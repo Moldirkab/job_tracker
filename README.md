@@ -124,4 +124,4 @@ cd backend
 pytest
 ```
 
-Requires a separate `job_tracker_test` database (see `sql/000_initial_schema.sql`) and a `TEST_DB_PASSWORD` value in `.env`.
+Requires a separate `job_tracker_test` database (see `sql/000_initial_schema.sql`) and a `LOCAL_TEST_DB_PASSWORD` value in `.env`.
